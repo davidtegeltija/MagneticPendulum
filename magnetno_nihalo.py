@@ -13,12 +13,11 @@ import scipy.special as special
 mu_0 = 4*np.pi * 1e-7
 g = 9.81
 L = 1. #visina magneta na kateri visi
-R = 10 #radij magneta
+R = 1 #radij magneta
 omega = np.sqrt(g/L)
 
 m1 = R*np.array([0, 0, 1]) #magnetic moment 
 m2 = R*np.array([0, 0, 1])
-# m2 = R*np.array([0, 0, 1])
 # N = 100
 # x = np.linspace(-50.0, 50.0, N)
 # y = np.linspace(-50.0, 50.0, N)
@@ -28,12 +27,7 @@ dy = 0.01
 border = L
 x = np.arange(-border, border + dx, dx)
 y = np.arange(-border, border + dy, dy)
-# N = 1000
-# r = np.arange(0, 1, N)
-# phi = np.linspace(0, 2*np.pi, N)
-# R, PHI = np.meshgrid(r, phi) 
-# X = R * np.cos(PHI)
-# Y = R * np.sin(PHI)
+
 
 # theta_x0 = 1.
 # theta_y0 = 0.
@@ -55,9 +49,15 @@ def A(r, m):
 def B(r, m):
     return mu_0/4*np.pi * (3. * r * np.dot(m, r)/np.linalg.norm(r)**5 - m/np.linalg.norm(r)**3)
 
-#magnetic force
+#magnetic force between two magnetic dipoles
 def F(r, m1, m2):
     return 3*mu_0 / (4*np.pi*np.linalg.norm(r)**5) * ((np.dot(m1, r)*m2 + np.dot(m2, r)*m1 + np.dot(m1, m2)*r - 5*np.dot(m1, r)*np.dot(m2, r) / np.linalg.norm(r)**2 * r ))
+
+# magnetic force between two cylindrical magnets
+# def F(r):
+#     return np.pi*mu_0/4 * 
+
+
 
 
 ############################  POSITION OF MAGNETS  ############################
@@ -127,17 +127,17 @@ def force(x, y, magnets):
     pendulum_force = np.zeros(2)
     r = (x**2 + y**2)**0.5
     theta = np.arctan(r/L)
-    alpha = np.arctan(y/x)
+    # alpha = np.arctan(y/x)
     for i in range(len(magnets)):
-        r_vec = np.array([ np.abs(x - magnets[i][0]), np.abs(y - magnets[i][1]), L * np.cos(theta)])
+        r_vec = np.array([ np.abs(x - magnets[i][0]), np.abs(y - magnets[i][1]), 0])
         force = F(r_vec, m1, m2)
         combined_force_of_magnets[0] += force[0]
         combined_force_of_magnets[1] += force[1]
     
 
-    pendulum_force[0] = omega**2 * np.sin(theta) * np.cos(alpha)
-    pendulum_force[1] = omega**2 * np.sin(theta) * np.sin(alpha)
-    return - pendulum_force - combined_force_of_magnets #I AM NOT SURE ABOUT SIGNS +/-
+    pendulum_force[0] = omega**2 * np.sin(theta) * x/r
+    pendulum_force[1] = omega**2 * np.sin(theta) * y/r
+    return - pendulum_force + combined_force_of_magnets #I AM NOT SURE ABOUT SIGNS +/-
 
 
 # def force_y(theta_y, x, y):
@@ -161,9 +161,9 @@ def pendulum(state, t, magnets):
     return derivitives
 
 
-magnets = configuration_of_magnets(x, y, 5, 1, False)
+magnets = configuration_of_magnets(x, y, 3, 1, False)
 # print(magnets[1])
-solution = odeint(pendulum, initial_conditions, t, args=(configuration_of_magnets(x, y, 5), ))
+solution = odeint(pendulum, initial_conditions, t, args=(magnets,))
 
 plt.plot(magnets[:, 0], magnets[:, 1], "o")
 # plt.plot(magnets[1][0], magnets[1][1], "o")
@@ -190,6 +190,35 @@ plt.show()
 
 
 
+
+############################  ANIMATION ############################
+
+
+x_koordinata = solution[:, 0]
+y_koordinata = solution[:, 1]
+x_magnets = magnets[:, 0]
+y_magnets = magnets[:, 1]
+
+fig = plt.figure()
+axis = fig.add_subplot(xlim = (-2, 2), ylim =(-2, 2))
+# axis.grid()   ne rabim več, ker uporabljam plt.style.use("bmh")
+line, = axis.plot([], [], "o-", linewidth=2) 
+time_text = axis.text(0.05, 0.9, "", transform=axis.transAxes)
+plt.plot(x_magnets, y_magnets, "o", color="black", markersize=5)
+
+
+def animate(i):
+    x = x_koordinata[i]
+    y = y_koordinata[i]
+    line.set_data(x, y)
+    time_text.set_text("time =%.1fs" %(i * 0.02))    #"time=%.1f" % čas je enako kot da napisemo "time={}s".format(round(i*dt, 1))
+    return line, time_text
+
+ani = animation.FuncAnimation(fig, animate, frames=200, interval=20, blit=False)
+
+writervideo = animation.PillowWriter(fps=26) 
+ani.save("C:/Users/David/Documents/IPT/animacija.gif", writer=writervideo)
+plt.show()
 
 
 
@@ -232,18 +261,4 @@ plt.show()
 # plt.show()
 
 
-
-############################  3D plot of vector field ############################
-# X, Y, Z = np.meshgrid(x, y, z)
-
-# u = np.sin(np.pi * X) * np.cos(np.pi * Y) * np.cos(np.pi * Z)
-# v = -np.cos(np.pi * X) * np.sin(np.pi * Y) * np.cos(np.pi * Z)
-# w = (np.sqrt(2.0 / 3.0) * np.cos(np.pi * X) * np.cos(np.pi * Y) * np.sin(np.pi * Z))
-
-# ax = plt.axes(projection='3d')
-# ax.quiver(X, Y, Z, u, v, w, length=0.1)
-# ax.set_xlabel("x", fontsize=12)
-# ax.set_ylabel("y", fontsize=12)
-# ax.set_zlabel("z", fontsize=12)
-# plt.show()
 
