@@ -1,63 +1,18 @@
 import numpy as np
 from matplotlib import pyplot as plt
-from mpl_toolkits.mplot3d import axes3d
 import random
 from scipy.integrate import odeint
 import matplotlib.animation as animation
 import scipy.integrate as integrate
-import scipy.special as special
 
-
-
-############################ CONSTANTS and FUNCTIONS ############################
+############################  CONSTANTS  ############################
 mu_0 = 4*np.pi * 1e-7
 g = 9.81
 L = 1. #visina magneta na kateri visi
-R = 1 #radij magneta
+h = 0.5  # višina med ravnino magnetov ter nihalom pod theta = 0
+magnetic_moment = 2000
+M = 1
 omega = np.sqrt(g/L)
-
-m1 = R*np.array([0, 0, 1]) #magnetic moment 
-m2 = R*np.array([0, 0, 1])
-# N = 100
-# x = np.linspace(-50.0, 50.0, N)
-# y = np.linspace(-50.0, 50.0, N)
-# z = np.linspace(-10.0, 10.0, N)
-dx = 0.01
-dy = 0.01
-border = L
-x = np.arange(-border, border + dx, dx)
-y = np.arange(-border, border + dy, dy)
-
-
-# theta_x0 = 1.
-# theta_y0 = 0.
-x0 = 1.
-y0 = 0.
-v_x0 = 0.
-v_y0 = 0.
-initial_conditions = [x0, y0, v_x0, v_y0]
-
-dt = dx
-t = np.arange(0.0, len(x) * dt, dt)
-
-
-#magnetic potencial
-def A(r, m):
-    return mu_0/4*np.pi * (np.cross(m, r) / r**3)
-
-#magnetic field
-def B(r, m):
-    return mu_0/4*np.pi * (3. * r * np.dot(m, r)/np.linalg.norm(r)**5 - m/np.linalg.norm(r)**3)
-
-#magnetic force between two magnetic dipoles
-def F(r, m1, m2):
-    return 3*mu_0 / (4*np.pi*np.linalg.norm(r)**5) * ((np.dot(m1, r)*m2 + np.dot(m2, r)*m1 + np.dot(m1, m2)*r - 5*np.dot(m1, r)*np.dot(m2, r) / np.linalg.norm(r)**2 * r ))
-
-# magnetic force between two cylindrical magnets
-# def F(r):
-#     return np.pi*mu_0/4 * 
-
-
 
 
 ############################  POSITION OF MAGNETS  ############################
@@ -96,8 +51,6 @@ def configuration_of_magnets(x, y, N, distance=1, random_positions=False):
             positions[i] = lenght*np.cos(theta), lenght*np.sin(theta)
         return positions
 
-
-
 def magnetic_field(x, y, number_of_magnets):
     N = len(x)
     M = len(y)
@@ -110,11 +63,27 @@ def magnetic_field(x, y, number_of_magnets):
                 mag_field[i, j] += np.linalg.norm( B(r, m1) ) 
     return mag_field, positions
 
+def extra_magnets(list_of_extra_magnets, x, y, number_of_magnets, distance):
+    magnets = configuration_of_magnets(x, y, number_of_magnets, distance, False)
+    for i in list_of_extra_magnets:
+        magnets = np.append(magnets, i)
+    magnets = magnets.reshape([number_of_magnets + len(list_of_extra_magnets), 2])
+    return magnets
 
 
-# mag_field = magnetic_field(x, y, 6)[0]
-# position_of_magnets = magnetic_field(x, y, 3)[1]
+############################  FUNCTIONS  ############################
+#magnetic potencial
+def A(r, m):
+    return mu_0/4*np.pi * (np.cross(m, r) / r**3)
 
+#magnetic field
+def B(r, m):
+    return mu_0/4*np.pi * (3. * r * np.dot(m, r)/np.linalg.norm(r)**5 - m/np.linalg.norm(r)**3)
+
+#magnetic force between two magnetic dipoles
+def F(r, m1, m2):
+    force = 3*mu_0 / (4*np.pi*np.linalg.norm(r)**5) * ((np.dot(m1, r)*m2 + np.dot(m2, r)*m1 + np.dot(m1, m2)*r - 5*np.dot(m1, r)*np.dot(m2, r) / np.linalg.norm(r)**2 * r ))
+    return force
 
 
 
@@ -123,29 +92,30 @@ def force(x, y, magnets):
     # x = position[0]
     # y = position[1]
     # z = position[2]
-    combined_force_of_magnets = np.zeros(2)
-    pendulum_force = np.zeros(2)
+    combined_force_of_magnets = np.zeros(3)
+    pendulum_force = np.zeros(3)
     r = (x**2 + y**2)**0.5
     theta = np.arctan(r/L)
     # alpha = np.arctan(y/x)
+    m1 = magnetic_moment * np.array([0, 0, 1]) #magnetic moment of stationary magnets
+    # m2 = magnetic_moment * np.array([np.sin(theta) * x/r, np.sin(theta) * y/r, np.cos(theta)])
+    m2 = magnetic_moment * np.array([0, 0, 1])
     for i in range(len(magnets)):
-        r_vec = np.array([ np.abs(x - magnets[i][0]), np.abs(y - magnets[i][1]), 0])
+        r_vec = np.array([ x - magnets[i][0], y - magnets[i][1], h + L - np.sqrt(L**2 - x**2 - y**2)])
         force = F(r_vec, m1, m2)
         combined_force_of_magnets[0] += force[0]
         combined_force_of_magnets[1] += force[1]
-    
+        combined_force_of_magnets[2] += force[2]
 
-    pendulum_force[0] = omega**2 * np.sin(theta) * x/r
-    pendulum_force[1] = omega**2 * np.sin(theta) * y/r
-    return - pendulum_force + combined_force_of_magnets #I AM NOT SURE ABOUT SIGNS +/-
-
-
-# def force_y(theta_y, x, y):
-#     m1 = R*np.array([0, 0, 1])
-#     m2 = R*np.array([0, 0, 1])
-#     r = (x**2 + y**2)**0.5
-#     theta = np.arcsin(r/L)
-#     return -omega**2 * np.sin(theta) -F(r, m1, m2)[1]
+    # pendulum_force[0] = omega**2 * x/r * np.sin(theta) 
+    # pendulum_force[1] = omega**2 * y/r * np.sin(theta) 
+    # pendulum_force[2] = omega**2 * np.cos(theta)
+    gravity_force = [0, 0, - g * M]
+    force = gravity_force + combined_force_of_magnets
+    vector = [x, y, -L - h + np.sqrt(L**2 - x**2 - y**2)]
+    projection = [np.dot(force, vector) * vector[0], np.dot(force, vector) * vector[1], np.dot(force, vector) * vector[2]]
+    force = force - projection
+    return force[: -1] #- pendulum_force + combined_force_of_magnets #I AM NOT SURE ABOUT SIGNS +/-
 
 
 # a simple pendulum y''= F(y) , state = (y,v)
@@ -154,71 +124,40 @@ def pendulum(state, t, magnets):
     derivitives = np.zeros_like(state)
     derivitives[0] = v_x                #dxdt[0] = derivites[0] = state[1] = v_x
     derivitives[1] = v_y                #dydt[0] = derivites[1] = state[2] = v_y
+    # derivitives[2] = v_z
     derivitives[2] = force(x, y, magnets)[0]     #dxdt[1] = derivites[2] = F_x
     derivitives[3] = force(x, y, magnets)[1]     #dydt[1] = derivites[3] = F_y
-    # dydt[0] = state[1][1] # x' = v 
-    # dydt[1] = force(state[1][0])  # v' = F(x)
+    # derivitives[5] = force(x, y, magnets)[2]
     return derivitives
 
 
-magnets = configuration_of_magnets(x, y, 3, 1, False)
-# print(magnets[1])
-solution = odeint(pendulum, initial_conditions, t, args=(magnets,))
 
-plt.plot(magnets[:, 0], magnets[:, 1], "o")
-# plt.plot(magnets[1][0], magnets[1][1], "o")
-# plt.xlim(-3, 3)
-# plt.ylim(-3, 3)
-plt.grid()
-plt.show()
 
-plt.plot(t, solution[:, 0], label="x") #resitev za x
-plt.plot(t, solution[:, 1], label="y") #resitev za y
-plt.plot(t, solution[:, 2])
-plt.legend()
-plt.show()
-
-for i in [0, 10, 20, 50, 100, 120, 150, 175, 200]:
-    plt.plot(solution[i, 0], solution[i, 1], "o", label="{}s".format(i))
-plt.plot(solution[175, 0], solution[175, 1], "o")
-plt.plot(magnets[:, 0], magnets[:, 1], "o", markersize=10, color="black", label="magnets")
-# plt.xlim(-border - 1, border + 1)
-# plt.ylim(-border - 1, border + 1)
-plt.grid()
-plt.legend()
-plt.show()
+#dont need this 
+# m1 = magnetic_moment*np.array([0, 0, 1]) #magnetic moment of stationary magnets
+# m2 = magnetic_moment*np.array([0, 0, 1]) #magnetic moment of stationary magnets
+# for razdalja in [[0.01, 0, 0], [0.1, 0, 0], [0.5, 0, 0], [0.75, 0, 0], [1, 0, 0], [1.2, 0, 0], [1.5, 0, 0], [1.7, 0, 0], [2, 0, 0]]:
+#     print(F(np.array(razdalja), m1, m2))
+#     r = (razdalja[0]**2 + razdalja[1]**2)**0.5
+#     theta = np.arctan(r/L)
+#     pendulum_force = omega**2 * np.sin(theta) * razdalja[0]/r
+#     plt.plot(razdalja[0], pendulum_force, "o", label="pendulum", color="b")
+#     plt.plot(razdalja[0], F(np.array(razdalja), m1, m2)[0], "o", label="magnets", color="r")
+# plt.legend(["pendulum", "magnets"])
+# plt.show()
 
 
 
 
-############################  ANIMATION ############################
-
-
-x_koordinata = solution[:, 0]
-y_koordinata = solution[:, 1]
-x_magnets = magnets[:, 0]
-y_magnets = magnets[:, 1]
-
-fig = plt.figure()
-axis = fig.add_subplot(xlim = (-2, 2), ylim =(-2, 2))
-# axis.grid()   ne rabim več, ker uporabljam plt.style.use("bmh")
-line, = axis.plot([], [], "o-", linewidth=2) 
-time_text = axis.text(0.05, 0.9, "", transform=axis.transAxes)
-plt.plot(x_magnets, y_magnets, "o", color="black", markersize=5)
-
-
-def animate(i):
-    x = x_koordinata[i]
-    y = y_koordinata[i]
-    line.set_data(x, y)
-    time_text.set_text("time =%.1fs" %(i * 0.02))    #"time=%.1f" % čas je enako kot da napisemo "time={}s".format(round(i*dt, 1))
-    return line, time_text
-
-ani = animation.FuncAnimation(fig, animate, frames=200, interval=20, blit=False)
-
-writervideo = animation.PillowWriter(fps=26) 
-ani.save("C:/Users/David/Documents/IPT/animacija.gif", writer=writervideo)
-plt.show()
+# for i in [0, 10, 20, 50, 100, 120, 150, 175, 200]:
+#     plt.plot(solution[i, 0], solution[i, 1], "o", label="{}s".format(i))
+# plt.plot(solution[175, 0], solution[175, 1], "o")
+# plt.plot(magnets[:, 0], magnets[:, 1], "o", markersize=10, color="black", label="magnets")
+# # plt.xlim(-border - 1, border + 1)
+# # plt.ylim(-border - 1, border + 1)
+# plt.grid()
+# plt.legend()
+# plt.show()
 
 
 
