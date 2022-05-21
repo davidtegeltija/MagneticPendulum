@@ -1,2 +1,2 @@
 # MagneticPendulum
-Programming a model which predicts movement of a magnetic pendulum with different initial conditions
+Programming a model with which we analyse the movement and behaviour of a magnetic pendulum with different initial conditions
